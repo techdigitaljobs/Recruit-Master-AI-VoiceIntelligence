@@ -21,33 +21,40 @@ export const analyzeRecruitment = async (
     Role Strategy Analysis for Job Description:
     ${jd}
     
-    ${resume ? `Candidate Resume for Analysis:\n${resume}` : "Analyze the requirement for a target candidate benchmark profile."}
+    ${resume ? `Candidate Resume for Analysis:\n${resume}` : "No candidate provided. Analyze the requirement for a target candidate benchmark profile."}
+    
+    TASK: Provide a deep recruitment strategy and (if resume provided) a forensic audit of the candidate.
+    
+    CRITICAL INSTRUCTION FOR KEYWORD STUFFING:
+    Scan the resume specifically for "Job Description Injection". This is when a candidate copies phrases or unique keywords directly from the Job Description into their skills or summary section to trick ATS filters. 
+    Compare the unique terminology in the JD: "${jd.substring(0, 1000)}" against the resume.
     
     MANDATORY OUTPUT STRUCTURE (JSON):
-    1. Title: The official Job Title.
-    2. Summary: A 2-3 sentence strategic overview of the role.
-    3. Priority Requirements: The must-have technical/soft skills.
-    4. Essential CV Elements: Specific phrases or experiences that MUST appear on a top-tier CV.
-    5. Tech Glossary: Definitions for 5-8 technical terms found in the JD.
-    6. Sample Resume: A professional Markdown resume representing the "Gold Standard" for this JD.
-    7. Keywords: Primary skills, secondary skills, and a complex Boolean Sourcing String.
-    
-    ${resume ? `
-    8. Candidate Analysis (NESTED OBJECT):
-       - overallMatchPercentage: (0-100)
-       - matchingStrengths: (Array of strings)
-       - criticalGaps: (Array of strings)
-       - employmentGaps: (Specific dates/durations of gaps found)
-       - shortTermAssignments: (List of stints under 12 months)
-       - authenticityScore: (High/Medium/Low/Caution)
-       - keywordStuffingAnalysis:
-         - riskLevel: (Low/Elevated/High)
-         - findings: (Explain if the candidate has unnaturally repetitive keywords or skill lists that aren't supported by their experience summary)
-         - detectedArtificialClusters: (List the specific terms that seem stuffed or artificial)
-       - recruiterQuestions: (3-5 targeted questions to vet the candidate)
-    ` : "If no resume is provided, omit the candidateAnalysis object entirely."}
-    
-    9. Audio Script: A natural recruitment briefing for the team.
+    1. title: Official Job Title.
+    2. jobSummary: 2-3 sentence strategic overview.
+    3. priorityRequirements: Array of must-have skills.
+    4. essentialCvElements: Array of markers that must be on a CV.
+    5. hiringManagerPreferences: Array of cultural/soft preferences.
+    6. submissionTips: Array of tactical sell-in tips.
+    7. targetCompanies: Array of companies to headhunt from.
+    8. keywords: { primary: [], secondary: [], booleanStrings: [] }
+    9. techGlossary: [{ term: string, explanation: string }] (5-8 terms)
+    10. sampleResume: Professional Markdown benchmark profile.
+    11. candidateAnalysis: (ONLY if resume provided)
+        - overallMatchPercentage: (Number)
+        - skillMatchPercentage: (Number)
+        - matchingStrengths: []
+        - criticalGaps: []
+        - employmentGaps: []
+        - shortTermAssignments: []
+        - authenticityScore: 'High' | 'Medium' | 'Low' | 'Caution'
+        - authenticityReasoning: String explanation.
+        - keywordStuffingAnalysis: 
+            - riskLevel: 'Low' | 'Elevated' | 'High'
+            - findings: Detail if they used JD-specific phrases unnaturally.
+            - detectedArtificialClusters: List phrases copied directly from JD.
+        - recruiterQuestions: []
+    12. audioScript: Recruiter briefing script.
   `;
 
   const response = await ai.models.generateContent({
@@ -116,7 +123,12 @@ export const analyzeRecruitment = async (
     },
   });
 
-  return JSON.parse(response.text);
+  try {
+    return JSON.parse(response.text);
+  } catch (e) {
+    console.error("JSON Parsing failed. Raw response:", response.text);
+    throw new Error("The AI returned an invalid format. Please try refining the job description.");
+  }
 };
 
 export function decode(base64: string) {
@@ -195,7 +207,7 @@ export const generateAudio = async (text: string): Promise<string> => {
 
 function encodeMp3(pcmData: Uint8Array, channels: number, sampleRate: number, kbps: number): Blob {
   const lame = getLameJS();
-  if (!lame) throw new Error("lamejs library not loaded.");
+  if (!lame) throw new Error("Audio engine (lamejs) not initialized.");
   const mp3encoder = new lame.Mp3Encoder(channels, sampleRate, kbps);
   const samples = new Int16Array(pcmData.buffer);
   const mp3Data: Uint8Array[] = [];

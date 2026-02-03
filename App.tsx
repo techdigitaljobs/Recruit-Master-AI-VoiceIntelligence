@@ -45,12 +45,14 @@ import mammoth from 'mammoth';
 // @ts-ignore
 import * as pdfjsLib from 'pdfjs-dist';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Use a specific version for the worker to avoid mismatches
+const PDFJS_VERSION = '4.0.379';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
 
 // --- Components ---
 
 const ResumeRenderer: React.FC<{ markdown: string }> = ({ markdown }) => {
-  if (!markdown) return <div className="text-slate-400 italic">No benchmark generated.</div>;
+  if (!markdown) return <div className="text-slate-400 italic py-10 text-center">Benchmark profile is being prepared...</div>;
   
   const lines = markdown.split('\n');
   const rendered: React.ReactNode[] = [];
@@ -147,18 +149,15 @@ export default function App() {
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value;
       } else if (extension === 'doc') {
-        setError("Old .doc format is not fully supported in-browser. Please use .docx or .pdf for best results, or copy and paste the text.");
-        setResumeFileName('');
-        setIsParsingResume(false);
-        return;
+        throw new Error("Old .doc format is not supported. Please convert to .docx or .pdf.");
       } else {
-        throw new Error("Unsupported file format. Use .pdf or .docx.");
+        throw new Error("Unsupported file format. Please use .pdf or .docx.");
       }
 
-      if (!text.trim()) throw new Error("Extraction failed. The file might be empty or image-based.");
+      if (!text.trim()) throw new Error("The file seems to be empty or contains only images.");
       setResumeText(text);
     } catch (err: any) {
-      setError(err.message || "Failed to parse resume.");
+      setError(err.message || "Could not read the resume file.");
       setResumeFileName('');
     } finally {
       setIsParsingResume(false);
@@ -166,7 +165,7 @@ export default function App() {
   };
 
   const handleAnalysis = async () => {
-    if (!jd.trim()) { setError('Please provide a job description.'); return; }
+    if (!jd.trim()) { setError('A job description is required to proceed.'); return; }
 
     setIsAnalyzing(true);
     setError(null);
@@ -178,7 +177,7 @@ export default function App() {
       const newHistoryItem: JDHistory = {
         id: Date.now().toString(),
         timestamp: Date.now(),
-        title: result.title || "Untitled Requirement",
+        title: result.title || "New Requirement",
         analysis: result
       };
       setHistory(prev => [newHistoryItem, ...prev]);
@@ -189,7 +188,7 @@ export default function App() {
       setActiveTab('strategy');
     } catch (err: any) {
       console.error(err);
-      setError('Analysis failed. This might be due to a complex JD or API limits. Try again with a shorter JD.');
+      setError('Recruitment Intelligence Engine timed out or encountered an error. Please simplify the input and try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -245,13 +244,13 @@ export default function App() {
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `You are a Recruitment Lead for ${currentAnalysis.title}. Discuss the strategy.`,
+          systemInstruction: `You are a Recruitment Lead for the role: ${currentAnalysis.title}. Discuss recruitment strategy and candidate vetting.`,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } }
         }
       });
       liveSessionRef.current = await sessionPromise;
     } catch (e) {
-      setError("Live chat failed.");
+      setError("Audio session could not be established.");
       stopLiveChat();
     }
   };
@@ -280,7 +279,7 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <button 
             onClick={() => { setCurrentId(null); setJd(''); setResumeText(''); setResumeFileName(''); }}
-            className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${!currentId ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${!currentId ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <PlusCircle size={18} /> New Requirement
           </button>
@@ -288,7 +287,7 @@ export default function App() {
           {history.map(item => (
             <button 
               key={item.id}
-              onClick={() => setCurrentId(item.id)}
+              onClick={() => { setCurrentId(item.id); setActiveTab('strategy'); }}
               className={`w-full text-left px-4 py-3 rounded-xl transition-all border ${currentId === item.id ? 'bg-white border-indigo-200 shadow-sm' : 'border-transparent hover:bg-slate-50'}`}
             >
               <div className="font-bold text-slate-900 text-sm truncate">{item.title}</div>
@@ -303,8 +302,8 @@ export default function App() {
         {!currentId && !isAnalyzing ? (
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
             <header className="text-center space-y-2">
-              <h2 className="text-3xl font-black text-slate-900">Analyze New Requirement</h2>
-              <p className="text-slate-500">Paste your JD and optionally a resume for deep evaluation.</p>
+              <h2 className="text-3xl font-black text-slate-900">Talent Intelligence Portal</h2>
+              <p className="text-slate-500">Analyze job descriptions and audit candidates for ATS keyword stuffing.</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -312,22 +311,22 @@ export default function App() {
                 <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><FileText size={14}/> Job Description</label>
                 <textarea 
                   className="w-full h-80 p-6 rounded-[2rem] border border-slate-200 bg-white shadow-sm focus:ring-4 focus:ring-indigo-100 outline-none resize-none text-sm leading-relaxed"
-                  placeholder="Paste job description here..."
+                  placeholder="Paste your requirement details here..."
                   value={jd}
                   onChange={e => setJd(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><Search size={14}/> Benchmark Candidate (Optional)</label>
+                <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><Search size={14}/> Candidate Audit (Optional)</label>
                 <div className="h-80 w-full rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white flex flex-col items-center justify-center p-8 transition-all relative overflow-hidden">
                   {!resumeFileName ? (
                     <label className="cursor-pointer group flex flex-col items-center gap-4 text-center">
                       <div className="p-5 bg-indigo-50 rounded-full group-hover:scale-110 transition-transform"><FileUp size={40} className="text-indigo-600"/></div>
                       <div>
-                        <span className="text-sm font-bold text-indigo-600">Upload PDF/DOCX</span>
-                        <p className="text-[10px] text-slate-400 mt-1">Gaps and Stints will be analyzed</p>
+                        <span className="text-sm font-bold text-indigo-600">Upload Resume</span>
+                        <p className="text-[10px] text-slate-400 mt-1">PDF or DOCX supported</p>
                       </div>
-                      <input type="file" className="hidden" accept=".pdf,.docx,.doc" onChange={handleResumeUpload} />
+                      <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleResumeUpload} />
                     </label>
                   ) : (
                     <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
@@ -341,7 +340,7 @@ export default function App() {
                   {isParsingResume && (
                     <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center">
                       <Loader2 className="animate-spin text-indigo-600 mb-2" size={32}/>
-                      <span className="text-sm font-bold">Parsing...</span>
+                      <span className="text-sm font-bold">Extracting Data...</span>
                     </div>
                   )}
                 </div>
@@ -359,7 +358,7 @@ export default function App() {
               disabled={isAnalyzing || !jd.trim()}
               className="w-full py-5 bg-slate-900 hover:bg-black text-white rounded-[2rem] font-black text-lg shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 disabled:bg-slate-200"
             >
-              Analyze Requirement <ArrowRight size={20}/>
+              Generate Intelligence Report <ArrowRight size={20}/>
             </button>
           </div>
         ) : isAnalyzing ? (
@@ -369,8 +368,8 @@ export default function App() {
               <div className="absolute inset-0 flex items-center justify-center"><Briefcase size={32} className="text-indigo-600"/></div>
             </div>
             <div className="text-center space-y-1">
-              <h3 className="text-xl font-black">AI Vetting in Progress</h3>
-              <p className="text-slate-500 text-sm italic">Analyzing gaps, stints, and building benchmark profile...</p>
+              <h3 className="text-xl font-black">Assembling Talent Report</h3>
+              <p className="text-slate-500 text-sm italic">Scanning for ATS manipulation and keyword stuffing...</p>
             </div>
           </div>
         ) : (
@@ -381,7 +380,7 @@ export default function App() {
             <header className="flex flex-wrap items-center justify-between gap-6 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm no-print sticky top-0 z-40 backdrop-blur-md bg-white/90">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="px-3 py-0.5 bg-indigo-600 text-white text-[10px] font-black rounded uppercase tracking-widest">Active Report</span>
+                  <span className="px-3 py-0.5 bg-indigo-600 text-white text-[10px] font-black rounded uppercase tracking-widest">Requirement Audit</span>
                   <span className="text-[10px] font-mono text-slate-400 font-bold">ID: {currentId}</span>
                 </div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">{currentAnalysis?.title}</h2>
@@ -395,11 +394,11 @@ export default function App() {
                 )}
                 {!isLiveActive ? (
                   <button onClick={startLiveChat} disabled={isLiveConnecting} className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-black transition flex items-center gap-2">
-                    {isLiveConnecting ? <Loader2 className="animate-spin" size={14}/> : <Mic2 size={14}/>} Start Audio Vetting
+                    {isLiveConnecting ? <Loader2 className="animate-spin" size={14}/> : <Mic2 size={14}/>} Vetting Assistant
                   </button>
                 ) : (
                   <button onClick={stopLiveChat} className="px-6 py-2.5 bg-red-600 text-white rounded-2xl text-xs font-bold animate-pulse flex items-center gap-2">
-                    <Square size={14} fill="currentColor"/> Stop Chat
+                    <Square size={14} fill="currentColor"/> Stop Session
                   </button>
                 )}
               </div>
@@ -428,19 +427,19 @@ export default function App() {
                 {/* Left: Summary & Preferences */}
                 <div className="md:col-span-2 space-y-8">
                   <section className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100">
-                    <h3 className="text-xl font-black mb-6 flex items-center gap-3"><Info className="text-indigo-600"/> Recruitment Essence</h3>
+                    <h3 className="text-xl font-black mb-6 flex items-center gap-3"><Info className="text-indigo-600"/> Role Essence</h3>
                     <p className="text-slate-600 text-lg font-light leading-relaxed border-l-4 border-indigo-200 pl-8 italic">"{currentAnalysis?.jobSummary}"</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
                       <div>
-                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Non-Negotiables</h4>
+                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Hard Non-Negotiables</h4>
                         <ul className="space-y-3">
-                          {currentAnalysis?.priorityRequirements.map((r, i) => (
+                          {currentAnalysis?.priorityRequirements?.map((r, i) => (
                             <li key={i} className="flex gap-3 text-sm font-bold text-slate-800"><CheckCircle2 className="text-green-500 shrink-0" size={18}/> {r}</li>
-                          ))}
+                          )) || <li className="text-slate-400 text-xs italic">N/A</li>}
                         </ul>
                       </div>
                       <div>
-                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Submission Playbook</h4>
+                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Tactical Sell-in</h4>
                         <ul className="space-y-3">
                           {currentAnalysis?.submissionTips?.map((t, i) => (
                             <li key={i} className="flex gap-3 text-sm font-medium text-slate-600 italic">
@@ -454,17 +453,17 @@ export default function App() {
 
                   {/* Sourcing Taxonomy */}
                   <section className="bg-slate-900 rounded-[2rem] p-10 text-white shadow-xl">
-                    <h3 className="text-xl font-black mb-8 tracking-tight">Sourcing Architecture</h3>
+                    <h3 className="text-xl font-black mb-8 tracking-tight">Sourcing Engine</h3>
                     <div className="space-y-8">
                       <div>
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Master Sourcing String</h4>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Boolean Master String</h4>
                         <div className="bg-slate-800 p-6 rounded-2xl font-mono text-[11px] text-indigo-300 break-words border border-slate-700">
-                          {currentAnalysis?.keywords?.booleanStrings?.[0] || 'Generating sourcing strategy...'}
+                          {currentAnalysis?.keywords?.booleanStrings?.[0] || 'Optimizing sourcing logic...'}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-8">
                         <div>
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Keywords (Primary)</h4>
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Primary Keywords</h4>
                           <div className="flex flex-wrap gap-2">
                             {currentAnalysis?.keywords?.primary?.map((k, i) => (
                               <span key={i} className="px-3 py-1 bg-slate-800 text-indigo-200 rounded-lg text-[10px] font-bold border border-slate-700">{k}</span>
@@ -476,7 +475,7 @@ export default function App() {
                           <div className="flex flex-wrap gap-2">
                             {currentAnalysis?.targetCompanies?.map((c, i) => (
                               <span key={i} className="px-3 py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold border border-slate-700">{c}</span>
-                            )) || <span className="text-slate-500 text-[10px] italic">Extracting...</span>}
+                            )) || <span className="text-slate-500 text-[10px] italic">Researching pools...</span>}
                           </div>
                         </div>
                       </div>
@@ -490,8 +489,8 @@ export default function App() {
                     <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 space-y-10">
                       <div className="text-center">
                         <div className="inline-flex flex-col items-center justify-center w-32 h-32 rounded-full border-4 border-indigo-50 bg-indigo-50/30 mb-4">
-                          <span className="text-4xl font-black text-indigo-700">{currentAnalysis.candidateAnalysis.overallMatchPercentage}%</span>
-                          <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest">Match Score</span>
+                          <span className="text-4xl font-black text-indigo-700">{currentAnalysis.candidateAnalysis.overallMatchPercentage || 0}%</span>
+                          <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest">Overall Match</span>
                         </div>
                       </div>
 
@@ -504,20 +503,20 @@ export default function App() {
                           </h4>
                           <div className="space-y-4 relative z-10">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-slate-400 font-bold">Risk Level</span>
+                              <span className="text-xs text-slate-400 font-bold">Stuffing Risk</span>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
                                 currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Low' ? 'bg-green-500/20 text-green-400' : 
                                 currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Elevated' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'
                               }`}>
-                                {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel}
+                                {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel || 'N/A'}
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                              {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.findings}
+                              {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.findings || 'Analyzing textual patterns...'}
                             </p>
                             {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters?.length > 0 && (
                               <div className="pt-2 border-t border-slate-800">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Flagged Terms</span>
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">JD Injection Detected</span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters.map((term, i) => (
                                     <span key={i} className="px-2 py-1 bg-red-900/30 text-red-300 rounded text-[9px] font-mono border border-red-800/50">{term}</span>
@@ -531,22 +530,22 @@ export default function App() {
 
                       <div className="space-y-6">
                         <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Overall Authenticity</span>
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Authenticity Score</span>
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                             currentAnalysis.candidateAnalysis.authenticityScore === 'High' ? 'bg-green-100 text-green-700' : 
                             currentAnalysis.candidateAnalysis.authenticityScore === 'Caution' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
-                          }`}>{currentAnalysis.candidateAnalysis.authenticityScore}</span>
+                          }`}>{currentAnalysis.candidateAnalysis.authenticityScore || 'N/A'}</span>
                         </div>
                         <div>
-                          <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 flex items-center gap-2"><History size={12}/> Red Flags & Gaps</h4>
+                          <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 flex items-center gap-2"><History size={12}/> Red Flags & Tenure</h4>
                           <div className="space-y-2">
-                            {currentAnalysis.candidateAnalysis.employmentGaps?.map((g, i) => <div key={i} className="text-xs font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">GAP: {g}</div>)}
-                            {currentAnalysis.candidateAnalysis.shortTermAssignments?.map((s, i) => <div key={i} className="text-xs font-bold text-orange-600 bg-orange-50 p-2 rounded-lg border border-orange-100">STINT: {s}</div>)}
-                            {(!currentAnalysis.candidateAnalysis.employmentGaps?.length && !currentAnalysis.candidateAnalysis.shortTermAssignments?.length) && <p className="text-xs text-slate-400 italic">No stability issues identified.</p>}
+                            {currentAnalysis.candidateAnalysis.employmentGaps?.map((g, i) => <div key={i} className="text-xs font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">GAP: {g}</div>) || []}
+                            {currentAnalysis.candidateAnalysis.shortTermAssignments?.map((s, i) => <div key={i} className="text-xs font-bold text-orange-600 bg-orange-50 p-2 rounded-lg border border-orange-100">STINT: {s}</div>) || []}
+                            {(!currentAnalysis.candidateAnalysis.employmentGaps?.length && !currentAnalysis.candidateAnalysis.shortTermAssignments?.length) && <p className="text-xs text-slate-400 italic">Solid employment history.</p>}
                           </div>
                         </div>
                         <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100">
-                          <h4 className="text-xs font-black uppercase text-indigo-700 tracking-widest mb-4">Screening Questions</h4>
+                          <h4 className="text-xs font-black uppercase text-indigo-700 tracking-widest mb-4">Vetting Questions</h4>
                           <ul className="space-y-3">
                             {currentAnalysis.candidateAnalysis.recruiterQuestions?.map((q, i) => <li key={i} className="text-xs font-bold text-indigo-900 leading-snug">"{q}"</li>) || <li className="text-xs italic text-slate-400">N/A</li>}
                           </ul>
@@ -556,8 +555,8 @@ export default function App() {
                   ) : (
                     <div className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100 border-dashed flex flex-col items-center justify-center text-center opacity-60 h-full min-h-[400px]">
                       <Search size={48} className="text-slate-300 mb-4"/>
-                      <p className="text-sm font-bold text-slate-400">No Candidate Analyzed</p>
-                      <p className="text-[10px] text-slate-400 mt-2 max-w-[200px]">Analyze with a resume next time to see Gaps, Stints, and Authenticity checks.</p>
+                      <p className="text-sm font-bold text-slate-400">No Candidate Audit</p>
+                      <p className="text-[10px] text-slate-400 mt-2 max-w-[200px]">Upload a resume to perform an ATS Integrity Audit and Gap Analysis.</p>
                     </div>
                   )}
                 </div>
@@ -570,10 +569,10 @@ export default function App() {
                 <div className="flex items-center justify-between no-print px-4">
                   <div>
                     <h3 className="text-xl font-black">Benchmark Candidate Profile</h3>
-                    <p className="text-xs text-slate-500 font-medium tracking-widest uppercase">Ideal candidate blueprint for this requirement</p>
+                    <p className="text-xs text-slate-500 font-medium tracking-widest uppercase">Target profile blueprint for this role</p>
                   </div>
                   <button onClick={() => window.print()} className="bg-white border border-slate-200 text-slate-900 px-6 py-2 rounded-2xl text-xs font-bold hover:bg-slate-50 shadow-sm transition flex items-center gap-2">
-                    <Download size={14}/> Print Benchmark PDF
+                    <Download size={14}/> Save Profile PDF
                   </button>
                 </div>
                 <div className="bg-white p-20 shadow-2xl border border-slate-100 mx-auto w-full min-h-[1100px] resume-container rounded-sm">
@@ -588,8 +587,8 @@ export default function App() {
                 <header className="bg-indigo-600 rounded-[2rem] p-10 text-white shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-10 opacity-10"><BookOpen size={160}/></div>
                   <div className="relative z-10 space-y-4">
-                    <h3 className="text-3xl font-black">Technical Knowledge Base</h3>
-                    <p className="text-indigo-100 max-w-2xl leading-relaxed font-medium">Equip yourself with the technical definitions and "Why It Matters" context for every complex skill found in this requirement.</p>
+                    <h3 className="text-3xl font-black">Technical Decoder</h3>
+                    <p className="text-indigo-100 max-w-2xl leading-relaxed font-medium">Clear definitions for technical terminology found in the Job Description to assist with non-technical vetting.</p>
                   </div>
                 </header>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -598,7 +597,7 @@ export default function App() {
                       <h4 className="text-indigo-600 font-black mb-3 text-lg group-hover:scale-105 transition-transform origin-left">{item.term}</h4>
                       <p className="text-slate-600 text-sm leading-relaxed font-medium">{item.explanation}</p>
                     </div>
-                  )) || <div className="text-slate-400 italic">No glossary entries found.</div>}
+                  )) || <div className="text-slate-400 italic">No glossary entries available.</div>}
                 </div>
               </div>
             )}
@@ -608,12 +607,12 @@ export default function App() {
 
         {/* Floating Active Indicator */}
         {isLiveActive && (
-          <div className="fixed bottom-10 right-10 z-50 animate-bounce">
-            <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-indigo-500">
+          <div className="fixed bottom-10 right-10 z-50">
+            <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-indigo-500 ring-4 ring-indigo-500/20">
               <div className="flex gap-0.5">
                 {[1,2,3,4].map(i => <div key={i} className="w-1 bg-indigo-400 rounded-full animate-pulse" style={{ height: `${Math.random()*20 + 4}px`, animationDelay: `${i*100}ms` }} />)}
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest">Vetting Engine Live</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">Assistant Live</span>
             </div>
           </div>
         )}
