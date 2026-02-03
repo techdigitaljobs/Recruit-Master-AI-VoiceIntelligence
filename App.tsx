@@ -50,6 +50,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dis
 // --- Components ---
 
 const ResumeRenderer: React.FC<{ markdown: string }> = ({ markdown }) => {
+  if (!markdown) return <div className="text-slate-400 italic">No benchmark generated.</div>;
+  
   const lines = markdown.split('\n');
   const rendered: React.ReactNode[] = [];
   let currentList: React.ReactNode[] = [];
@@ -145,8 +147,9 @@ export default function App() {
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value;
       } else if (extension === 'doc') {
-        setError("Legacy .doc files are binary and require local conversion. Please save as PDF or DOCX to continue, or paste the text directly.");
+        setError("Old .doc format is not fully supported in-browser. Please use .docx or .pdf for best results, or copy and paste the text.");
         setResumeFileName('');
+        setIsParsingResume(false);
         return;
       } else {
         throw new Error("Unsupported file format. Use .pdf or .docx.");
@@ -175,7 +178,7 @@ export default function App() {
       const newHistoryItem: JDHistory = {
         id: Date.now().toString(),
         timestamp: Date.now(),
-        title: result.title,
+        title: result.title || "Untitled Requirement",
         analysis: result
       };
       setHistory(prev => [newHistoryItem, ...prev]);
@@ -185,7 +188,8 @@ export default function App() {
       setAudioUrl(url);
       setActiveTab('strategy');
     } catch (err: any) {
-      setError('Analysis failed. Check your API key and connection.');
+      console.error(err);
+      setError('Analysis failed. This might be due to a complex JD or API limits. Try again with a shorter JD.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -438,11 +442,11 @@ export default function App() {
                       <div>
                         <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Submission Playbook</h4>
                         <ul className="space-y-3">
-                          {currentAnalysis?.submissionTips.map((t, i) => (
+                          {currentAnalysis?.submissionTips?.map((t, i) => (
                             <li key={i} className="flex gap-3 text-sm font-medium text-slate-600 italic">
                               <span className="text-indigo-600 font-black">#</span> {t}
                             </li>
-                          ))}
+                          )) || <li className="text-slate-400 text-xs italic">N/A</li>}
                         </ul>
                       </div>
                     </div>
@@ -464,8 +468,7 @@ export default function App() {
                           <div className="flex flex-wrap gap-2">
                             {currentAnalysis?.keywords?.primary?.map((k, i) => (
                               <span key={i} className="px-3 py-1 bg-slate-800 text-indigo-200 rounded-lg text-[10px] font-bold border border-slate-700">{k}</span>
-                            ))}
-                            {(!currentAnalysis?.keywords?.primary || currentAnalysis.keywords.primary.length === 0) && <span className="text-slate-500 text-[10px] italic">Extracting skills...</span>}
+                            )) || <span className="text-slate-500 text-[10px] italic">Extracting...</span>}
                           </div>
                         </div>
                         <div>
@@ -473,8 +476,7 @@ export default function App() {
                           <div className="flex flex-wrap gap-2">
                             {currentAnalysis?.targetCompanies?.map((c, i) => (
                               <span key={i} className="px-3 py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold border border-slate-700">{c}</span>
-                            ))}
-                            {(!currentAnalysis?.targetCompanies || currentAnalysis.targetCompanies.length === 0) && <span className="text-slate-500 text-[10px] italic">Identifying talent pools...</span>}
+                            )) || <span className="text-slate-500 text-[10px] italic">Extracting...</span>}
                           </div>
                         </div>
                       </div>
@@ -493,37 +495,39 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* ATS Integrity Audit Section - NEW */}
-                      <div className="p-6 bg-slate-900 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><ShieldAlert size={60} className="text-white"/></div>
-                        <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-4 flex items-center gap-2">
-                          <Fingerprint size={12}/> ATS Integrity Audit
-                        </h4>
-                        <div className="space-y-4 relative z-10">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-slate-400 font-bold">Risk Level</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
-                              currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Low' ? 'bg-green-500/20 text-green-400' : 
-                              currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Elevated' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'
-                            }`}>
-                              {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                            {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.findings}
-                          </p>
-                          {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters.length > 0 && (
-                            <div className="pt-2 border-t border-slate-800">
-                              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Flagged Terms</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters.map((term, i) => (
-                                  <span key={i} className="px-2 py-1 bg-red-900/30 text-red-300 rounded text-[9px] font-mono border border-red-800/50">{term}</span>
-                                ))}
-                              </div>
+                      {/* ATS Integrity Audit Section */}
+                      {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis && (
+                        <div className="p-6 bg-slate-900 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><ShieldAlert size={60} className="text-white"/></div>
+                          <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-4 flex items-center gap-2">
+                            <Fingerprint size={12}/> ATS Integrity Audit
+                          </h4>
+                          <div className="space-y-4 relative z-10">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-400 font-bold">Risk Level</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
+                                currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Low' ? 'bg-green-500/20 text-green-400' : 
+                                currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Elevated' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel}
+                              </span>
                             </div>
-                          )}
+                            <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                              {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.findings}
+                            </p>
+                            {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters?.length > 0 && (
+                              <div className="pt-2 border-t border-slate-800">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Flagged Terms</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters.map((term, i) => (
+                                    <span key={i} className="px-2 py-1 bg-red-900/30 text-red-300 rounded text-[9px] font-mono border border-red-800/50">{term}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div className="space-y-6">
                         <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -536,15 +540,15 @@ export default function App() {
                         <div>
                           <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 flex items-center gap-2"><History size={12}/> Red Flags & Gaps</h4>
                           <div className="space-y-2">
-                            {currentAnalysis.candidateAnalysis.employmentGaps.map((g, i) => <div key={i} className="text-xs font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">GAP: {g}</div>)}
-                            {currentAnalysis.candidateAnalysis.shortTermAssignments.map((s, i) => <div key={i} className="text-xs font-bold text-orange-600 bg-orange-50 p-2 rounded-lg border border-orange-100">STINT: {s}</div>)}
-                            {currentAnalysis.candidateAnalysis.employmentGaps.length === 0 && currentAnalysis.candidateAnalysis.shortTermAssignments.length === 0 && <p className="text-xs text-slate-400 italic">No stability issues identified.</p>}
+                            {currentAnalysis.candidateAnalysis.employmentGaps?.map((g, i) => <div key={i} className="text-xs font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">GAP: {g}</div>)}
+                            {currentAnalysis.candidateAnalysis.shortTermAssignments?.map((s, i) => <div key={i} className="text-xs font-bold text-orange-600 bg-orange-50 p-2 rounded-lg border border-orange-100">STINT: {s}</div>)}
+                            {(!currentAnalysis.candidateAnalysis.employmentGaps?.length && !currentAnalysis.candidateAnalysis.shortTermAssignments?.length) && <p className="text-xs text-slate-400 italic">No stability issues identified.</p>}
                           </div>
                         </div>
                         <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100">
                           <h4 className="text-xs font-black uppercase text-indigo-700 tracking-widest mb-4">Screening Questions</h4>
                           <ul className="space-y-3">
-                            {currentAnalysis.candidateAnalysis.recruiterQuestions.map((q, i) => <li key={i} className="text-xs font-bold text-indigo-900 leading-snug">"{q}"</li>)}
+                            {currentAnalysis.candidateAnalysis.recruiterQuestions?.map((q, i) => <li key={i} className="text-xs font-bold text-indigo-900 leading-snug">"{q}"</li>) || <li className="text-xs italic text-slate-400">N/A</li>}
                           </ul>
                         </div>
                       </div>
@@ -589,12 +593,12 @@ export default function App() {
                   </div>
                 </header>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {currentAnalysis?.techGlossary.map((item, i) => (
+                  {currentAnalysis?.techGlossary?.map((item, i) => (
                     <div key={i} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-indigo-200 transition-colors">
                       <h4 className="text-indigo-600 font-black mb-3 text-lg group-hover:scale-105 transition-transform origin-left">{item.term}</h4>
                       <p className="text-slate-600 text-sm leading-relaxed font-medium">{item.explanation}</p>
                     </div>
-                  ))}
+                  )) || <div className="text-slate-400 italic">No glossary entries found.</div>}
                 </div>
               </div>
             )}

@@ -21,27 +21,33 @@ export const analyzeRecruitment = async (
     Role Strategy Analysis for Job Description:
     ${jd}
     
-    ${resume ? `Candidate Data for Comparison:\n${resume}` : "Analyze the requirement for a target candidate benchmark."}
+    ${resume ? `Candidate Resume for Analysis:\n${resume}` : "Analyze the requirement for a target candidate benchmark profile."}
     
-    MANDATORY OUTPUT REQUIREMENTS:
-    1. Title: Extracted Job Title.
-    2. Summary: Clear-cut executive summary of the role's essence.
-    3. Priority Requirements: Top 3-5 critical non-negotiables.
-    4. Essential CV Elements: Technical/experience markers that MUST be on the CV.
-    5. Hiring Manager Preferences: Subtle "bonus" traits or cultures preferred.
-    6. Submission Tips: 3-5 tactical tips for sell-in to the manager.
-    7. Tech Glossary: Explain 5-8 complex technical terms from the JD for recruiters.
-    8. Benchmark Resume: Create a "Gold Standard" resume (Markdown format) that perfectly fits this JD.
-    9. Sourcing Keywords: Provide primary and secondary keywords and at least one complex Boolean string.
+    MANDATORY OUTPUT STRUCTURE (JSON):
+    1. Title: The official Job Title.
+    2. Summary: A 2-3 sentence strategic overview of the role.
+    3. Priority Requirements: The must-have technical/soft skills.
+    4. Essential CV Elements: Specific phrases or experiences that MUST appear on a top-tier CV.
+    5. Tech Glossary: Definitions for 5-8 technical terms found in the JD.
+    6. Sample Resume: A professional Markdown resume representing the "Gold Standard" for this JD.
+    7. Keywords: Primary skills, secondary skills, and a complex Boolean Sourcing String.
+    
     ${resume ? `
-    10. ATS Integrity Audit & Keyword Stuffing:
-        - Analyze the resume for "Keyword Stuffing" (unnatural repetition or skill lists intended to trick ATS).
-        - Determine if skills mentioned in the "Skills" section are actually backed up by the "Experience" section.
-        - Risk Levels: Low (Natural), Elevated (Suspicious clusters), High (Clear attempt to game filters).
-    11. Candidate Deep-Dive:
-        - Match percentages, Gaps, Short stints, and Authenticity score.
-    ` : ""}
-    12. Audio Script: A natural recruiter briefing covering all key points.
+    8. Candidate Analysis (NESTED OBJECT):
+       - overallMatchPercentage: (0-100)
+       - matchingStrengths: (Array of strings)
+       - criticalGaps: (Array of strings)
+       - employmentGaps: (Specific dates/durations of gaps found)
+       - shortTermAssignments: (List of stints under 12 months)
+       - authenticityScore: (High/Medium/Low/Caution)
+       - keywordStuffingAnalysis:
+         - riskLevel: (Low/Elevated/High)
+         - findings: (Explain if the candidate has unnaturally repetitive keywords or skill lists that aren't supported by their experience summary)
+         - detectedArtificialClusters: (List the specific terms that seem stuffed or artificial)
+       - recruiterQuestions: (3-5 targeted questions to vet the candidate)
+    ` : "If no resume is provided, omit the candidateAnalysis object entirely."}
+    
+    9. Audio Script: A natural recruitment briefing for the team.
   `;
 
   const response = await ai.models.generateContent({
@@ -94,7 +100,7 @@ export const analyzeRecruitment = async (
               keywordStuffingAnalysis: {
                 type: Type.OBJECT,
                 properties: {
-                  riskLevel: { type: Type.STRING, description: "Low, Elevated, or High" },
+                  riskLevel: { type: Type.STRING },
                   findings: { type: Type.STRING },
                   detectedArtificialClusters: { type: Type.ARRAY, items: { type: Type.STRING } }
                 },
