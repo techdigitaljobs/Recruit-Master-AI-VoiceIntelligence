@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecruitMaster AI - Talent Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
+    .font-serif { font-family: 'Merriweather', serif; }
+    
+    /* Resume Styling - Professional Standards */
+    .resume-preview { font-family: 'Merriweather', serif; color: #000; line-height: 1.4; }
+    .resume-preview h1 { font-size: 1.75rem; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.25rem; border: none; }
+    .resume-preview .contact-info { text-align: center; font-size: 0.85rem; color: #444; margin-bottom: 1.25rem; font-family: 'Inter', sans-serif; }
+    .resume-preview h2 { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; border-bottom: 1.5px solid #000; margin-top: 1.25rem; margin-bottom: 0.5rem; padding-bottom: 2px; }
+    .resume-preview p { font-size: 0.9rem; margin-bottom: 0.4rem; text-align: justify; }
+    .resume-preview ul { list-style-type: none; padding-left: 0; margin-bottom: 0.75rem; }
+    .resume-preview li { position: relative; padding-left: 1.2rem; font-size: 0.88rem; margin-bottom: 0.2rem; }
+    .resume-preview li::before { content: "•"; position: absolute; left: 0; font-weight: bold; }
+    .resume-preview strong { font-weight: 700; }
+
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white !important; }
+      .resume-container { box-shadow: none !important; border: none !important; padding: 0 !important; }
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.4",
+    "mammoth": "https://esm.sh/mammoth@1.6.0",
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@4.0.379"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div id="root"></div>
+</body>
+</html>

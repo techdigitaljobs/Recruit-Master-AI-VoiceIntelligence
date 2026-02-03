@@ -1,0 +1,7 @@
+{
+  "name": "RecruitMaster AI - Talent Intelligence",
+  "description": "Enterprise-grade recruitment intelligence tool for JD analysis, technical glossaries, and gap-aware candidate benchmarking.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
