@@ -45,14 +45,14 @@ import mammoth from 'mammoth';
 // @ts-ignore
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Use a specific version for the worker to avoid mismatches
+// Robust worker configuration
 const PDFJS_VERSION = '4.0.379';
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`;
 
 // --- Components ---
 
 const ResumeRenderer: React.FC<{ markdown: string }> = ({ markdown }) => {
-  if (!markdown) return <div className="text-slate-400 italic py-10 text-center">Benchmark profile is being prepared...</div>;
+  if (!markdown) return <div className="text-slate-400 italic py-12 text-center border-2 border-dashed border-slate-100 rounded-3xl">Benchmark profile generating...</div>;
   
   const lines = markdown.split('\n');
   const rendered: React.ReactNode[] = [];
@@ -148,16 +148,14 @@ export default function App() {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value;
-      } else if (extension === 'doc') {
-        throw new Error("Old .doc format is not supported. Please convert to .docx or .pdf.");
       } else {
-        throw new Error("Unsupported file format. Please use .pdf or .docx.");
+        throw new Error("Only .pdf and .docx files are currently supported for forensic analysis.");
       }
 
-      if (!text.trim()) throw new Error("The file seems to be empty or contains only images.");
+      if (!text.trim()) throw new Error("Document extraction returned empty text. Ensure the file is not just a scanned image.");
       setResumeText(text);
     } catch (err: any) {
-      setError(err.message || "Could not read the resume file.");
+      setError(err.message || "Failed to parse document.");
       setResumeFileName('');
     } finally {
       setIsParsingResume(false);
@@ -165,7 +163,7 @@ export default function App() {
   };
 
   const handleAnalysis = async () => {
-    if (!jd.trim()) { setError('A job description is required to proceed.'); return; }
+    if (!jd.trim()) { setError('A Job Description is required.'); return; }
 
     setIsAnalyzing(true);
     setError(null);
@@ -177,7 +175,7 @@ export default function App() {
       const newHistoryItem: JDHistory = {
         id: Date.now().toString(),
         timestamp: Date.now(),
-        title: result.title || "New Requirement",
+        title: result.title || "Talent Audit",
         analysis: result
       };
       setHistory(prev => [newHistoryItem, ...prev]);
@@ -188,7 +186,7 @@ export default function App() {
       setActiveTab('strategy');
     } catch (err: any) {
       console.error(err);
-      setError('Recruitment Intelligence Engine timed out or encountered an error. Please simplify the input and try again.');
+      setError('Analysis failed. The input might be too long or complex for the current API limits. Try a shorter version.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -223,7 +221,7 @@ export default function App() {
             scriptProcessorRef.current.connect(inputAudioContextRef.current!.destination);
           },
           onmessage: async (m: LiveServerMessage) => {
-            const base64 = m.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            const base64 = m.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64 && outputAudioContextRef.current) {
               const ctx = outputAudioContextRef.current;
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
@@ -244,13 +242,13 @@ export default function App() {
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `You are a Recruitment Lead for the role: ${currentAnalysis.title}. Discuss recruitment strategy and candidate vetting.`,
+          systemInstruction: `You are a Recruitment Lead for the following role: ${currentAnalysis.title}. Discuss sourcing strategy, vetting, and forensic candidate audits.`,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } }
         }
       });
       liveSessionRef.current = await sessionPromise;
     } catch (e) {
-      setError("Audio session could not be established.");
+      setError("Failed to start vetting session.");
       stopLiveChat();
     }
   };
@@ -266,81 +264,82 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 overflow-hidden selection:bg-indigo-100">
       
       {/* Sidebar: History */}
       <aside className="w-72 bg-white border-r border-slate-200 flex flex-col no-print shrink-0">
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-          <div className="p-2 bg-indigo-600 rounded-lg text-white">
-            <Briefcase size={20} />
+          <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
+            <Briefcase size={22} />
           </div>
-          <h1 className="font-black text-slate-900 tracking-tight">RecruitMaster</h1>
+          <h1 className="font-black text-slate-900 tracking-tight text-xl">RecruitMaster</h1>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <button 
             onClick={() => { setCurrentId(null); setJd(''); setResumeText(''); setResumeFileName(''); }}
-            className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${!currentId ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`w-full flex items-center gap-2 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${!currentId ? 'bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}
           >
-            <PlusCircle size={18} /> New Requirement
+            <PlusCircle size={18} /> New Audit
           </button>
-          <div className="pt-4 pb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4">History</div>
+          <div className="pt-6 pb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4">Audit Logs</div>
           {history.map(item => (
             <button 
               key={item.id}
               onClick={() => { setCurrentId(item.id); setActiveTab('strategy'); }}
-              className={`w-full text-left px-4 py-3 rounded-xl transition-all border ${currentId === item.id ? 'bg-white border-indigo-200 shadow-sm' : 'border-transparent hover:bg-slate-50'}`}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl transition-all border ${currentId === item.id ? 'bg-white border-indigo-200 shadow-sm ring-1 ring-indigo-50' : 'border-transparent hover:bg-slate-50'}`}
             >
               <div className="font-bold text-slate-900 text-sm truncate">{item.title}</div>
-              <div className="text-[10px] text-slate-400">{new Date(item.timestamp).toLocaleDateString()}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{new Date(item.timestamp).toLocaleDateString()} at {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
             </button>
           ))}
+          {history.length === 0 && <div className="p-4 text-center text-xs text-slate-400 italic">No previous audits found.</div>}
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto relative p-8">
         {!currentId && !isAnalyzing ? (
-          <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
-            <header className="text-center space-y-2">
-              <h2 className="text-3xl font-black text-slate-900">Talent Intelligence Portal</h2>
-              <p className="text-slate-500">Analyze job descriptions and audit candidates for ATS keyword stuffing.</p>
+          <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-500">
+            <header className="text-center space-y-3">
+              <h2 className="text-4xl font-black text-slate-900 tracking-tight">Talent Intelligence Portal</h2>
+              <p className="text-slate-500 text-lg">Forensic JD analysis and ATS-integrity candidate auditing.</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><FileText size={14}/> Job Description</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><FileText size={14}/> Job Requirement</label>
                 <textarea 
-                  className="w-full h-80 p-6 rounded-[2rem] border border-slate-200 bg-white shadow-sm focus:ring-4 focus:ring-indigo-100 outline-none resize-none text-sm leading-relaxed"
-                  placeholder="Paste your requirement details here..."
+                  className="w-full h-96 p-8 rounded-[2.5rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/50 focus:ring-8 focus:ring-indigo-100 outline-none resize-none text-sm leading-relaxed transition-all"
+                  placeholder="Paste Job Description for strategic mapping..."
                   value={jd}
                   onChange={e => setJd(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><Search size={14}/> Candidate Audit (Optional)</label>
-                <div className="h-80 w-full rounded-[2.5rem] border-2 border-dashed border-slate-200 bg-white flex flex-col items-center justify-center p-8 transition-all relative overflow-hidden">
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase text-slate-400 tracking-widest pl-1 flex items-center gap-2"><Search size={14}/> Forensic Audit (Optional)</label>
+                <div className="h-96 w-full rounded-[3rem] border-3 border-dashed border-slate-200 bg-white flex flex-col items-center justify-center p-10 transition-all relative overflow-hidden group hover:border-indigo-300">
                   {!resumeFileName ? (
-                    <label className="cursor-pointer group flex flex-col items-center gap-4 text-center">
-                      <div className="p-5 bg-indigo-50 rounded-full group-hover:scale-110 transition-transform"><FileUp size={40} className="text-indigo-600"/></div>
+                    <label className="cursor-pointer group flex flex-col items-center gap-6 text-center">
+                      <div className="p-7 bg-indigo-50 rounded-[2rem] group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300"><FileUp size={48} className="text-indigo-600 group-hover:text-white"/></div>
                       <div>
-                        <span className="text-sm font-bold text-indigo-600">Upload Resume</span>
-                        <p className="text-[10px] text-slate-400 mt-1">PDF or DOCX supported</p>
+                        <span className="text-lg font-black text-slate-800">Drop Resume Here</span>
+                        <p className="text-xs text-slate-400 mt-2 font-medium">Detect keyword stuffing & gap patterns</p>
                       </div>
                       <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleResumeUpload} />
                     </label>
                   ) : (
-                    <div className="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
-                      <div className="p-5 bg-green-50 rounded-full"><CheckCircle2 size={40} className="text-green-600"/></div>
+                    <div className="flex flex-col items-center gap-6 animate-in zoom-in duration-300">
+                      <div className="p-7 bg-green-50 rounded-[2rem] shadow-lg shadow-green-100"><CheckCircle2 size={48} className="text-green-600"/></div>
                       <div className="text-center">
-                        <p className="text-sm font-bold truncate max-w-[200px]">{resumeFileName}</p>
-                        <button onClick={() => { setResumeFileName(''); setResumeText(''); }} className="text-xs text-red-500 font-bold mt-2">Remove</button>
+                        <p className="text-lg font-black text-slate-900 truncate max-w-[250px]">{resumeFileName}</p>
+                        <button onClick={() => { setResumeFileName(''); setResumeText(''); }} className="text-xs text-red-500 font-black mt-3 hover:underline">Revoke Document</button>
                       </div>
                     </div>
                   )}
                   {isParsingResume && (
-                    <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center">
-                      <Loader2 className="animate-spin text-indigo-600 mb-2" size={32}/>
-                      <span className="text-sm font-bold">Extracting Data...</span>
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center z-50">
+                      <Loader2 className="animate-spin text-indigo-600 mb-4" size={40}/>
+                      <span className="text-sm font-black text-indigo-900 tracking-widest uppercase">Extracting Corpus...</span>
                     </div>
                   )}
                 </div>
@@ -348,101 +347,101 @@ export default function App() {
             </div>
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl flex items-center gap-3 text-sm font-medium">
-                <AlertCircle size={18}/> {error}
+              <div className="p-5 bg-red-50 border border-red-100 text-red-700 rounded-3xl flex items-center gap-4 text-sm font-bold animate-in shake duration-300">
+                <AlertCircle size={20} className="shrink-0"/> {error}
               </div>
             )}
 
             <button 
               onClick={handleAnalysis}
               disabled={isAnalyzing || !jd.trim()}
-              className="w-full py-5 bg-slate-900 hover:bg-black text-white rounded-[2rem] font-black text-lg shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 disabled:bg-slate-200"
+              className="w-full py-6 bg-slate-900 hover:bg-black text-white rounded-[2.5rem] font-black text-xl shadow-2xl hover:shadow-indigo-200 transition-all transform hover:-translate-y-1.5 flex items-center justify-center gap-4 disabled:bg-slate-200 disabled:transform-none"
             >
-              Generate Intelligence Report <ArrowRight size={20}/>
+              Initialize Intelligence Audit <ArrowRight size={24}/>
             </button>
           </div>
         ) : isAnalyzing ? (
-          <div className="h-full flex flex-col items-center justify-center space-y-6">
+          <div className="h-full flex flex-col items-center justify-center space-y-8 animate-pulse">
             <div className="relative">
-              <div className="w-24 h-24 border-8 border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center"><Briefcase size={32} className="text-indigo-600"/></div>
+              <div className="w-32 h-32 border-[12px] border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center"><Fingerprint size={48} className="text-indigo-600"/></div>
             </div>
-            <div className="text-center space-y-1">
-              <h3 className="text-xl font-black">Assembling Talent Report</h3>
-              <p className="text-slate-500 text-sm italic">Scanning for ATS manipulation and keyword stuffing...</p>
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-black tracking-tight">Vetting Engine Online</h3>
+              <p className="text-slate-500 text-sm font-medium italic">Performing forensic keyword analysis and tenure verification...</p>
             </div>
           </div>
         ) : (
           /* Results View */
-          <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+          <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
             
             {/* Control Header */}
-            <header className="flex flex-wrap items-center justify-between gap-6 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm no-print sticky top-0 z-40 backdrop-blur-md bg-white/90">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="px-3 py-0.5 bg-indigo-600 text-white text-[10px] font-black rounded uppercase tracking-widest">Requirement Audit</span>
-                  <span className="text-[10px] font-mono text-slate-400 font-bold">ID: {currentId}</span>
+            <header className="flex flex-wrap items-center justify-between gap-6 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-2xl no-print sticky top-0 z-40 backdrop-blur-xl bg-white/95">
+              <div className="max-w-md">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">Active Audit</span>
+                  <span className="text-[10px] font-mono text-slate-400 font-bold">SHA-256: {currentId?.substring(0, 12)}</span>
                 </div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">{currentAnalysis?.title}</h2>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">{currentAnalysis?.title}</h2>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {audioUrl && (
-                  <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-                    <audio src={audioUrl} controls className="h-8 w-40" />
-                    <button onClick={() => { const l = document.createElement('a'); l.href = audioUrl; l.download = "briefing.mp3"; l.click(); }} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-md"><Download size={16}/></button>
+                  <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-[1.5rem] border border-slate-200">
+                    <audio src={audioUrl} controls className="h-9 w-44" />
+                    <button onClick={() => { const l = document.createElement('a'); l.href = audioUrl; l.download = "intelligence_brief.mp3"; l.click(); }} className="p-2.5 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition shadow-lg"><Download size={18}/></button>
                   </div>
                 )}
                 {!isLiveActive ? (
-                  <button onClick={startLiveChat} disabled={isLiveConnecting} className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-black transition flex items-center gap-2">
-                    {isLiveConnecting ? <Loader2 className="animate-spin" size={14}/> : <Mic2 size={14}/>} Vetting Assistant
+                  <button onClick={startLiveChat} disabled={isLiveConnecting} className="px-8 py-3.5 bg-slate-900 text-white rounded-3xl text-sm font-black hover:bg-black transition-all flex items-center gap-3 shadow-xl hover:shadow-indigo-200">
+                    {isLiveConnecting ? <Loader2 className="animate-spin" size={18}/> : <Mic2 size={18}/>} RecruitVoice™ Live
                   </button>
                 ) : (
-                  <button onClick={stopLiveChat} className="px-6 py-2.5 bg-red-600 text-white rounded-2xl text-xs font-bold animate-pulse flex items-center gap-2">
-                    <Square size={14} fill="currentColor"/> Stop Session
+                  <button onClick={stopLiveChat} className="px-8 py-3.5 bg-red-600 text-white rounded-3xl text-sm font-black animate-pulse flex items-center gap-3 shadow-xl shadow-red-200">
+                    <Square size={18} fill="currentColor"/> End Session
                   </button>
                 )}
               </div>
             </header>
 
             {/* Navigation Tabs */}
-            <nav className="flex gap-2 no-print">
+            <nav className="flex gap-3 no-print p-1.5 bg-white rounded-3xl border border-slate-100 w-fit mx-auto shadow-sm">
               {[
-                { id: 'strategy', label: 'Strategy Board', icon: LayoutDashboard },
+                { id: 'strategy', label: 'Intelligence Board', icon: LayoutDashboard },
                 { id: 'resume', label: 'Benchmark CV', icon: Award },
                 { id: 'glossary', label: 'Tech Knowledge', icon: BookOpen }
               ].map(tab => (
                 <button 
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-white text-indigo-700 shadow-sm border border-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'}`}
+                  className={`flex items-center gap-2.5 px-8 py-3 rounded-[1.25rem] text-xs font-black transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                 >
-                  <tab.icon size={16}/> {tab.label}
+                  <tab.icon size={18}/> {tab.label}
                 </button>
               ))}
             </nav>
 
             {/* Tab Contents */}
             {activeTab === 'strategy' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                 {/* Left: Summary & Preferences */}
-                <div className="md:col-span-2 space-y-8">
-                  <section className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100">
-                    <h3 className="text-xl font-black mb-6 flex items-center gap-3"><Info className="text-indigo-600"/> Role Essence</h3>
-                    <p className="text-slate-600 text-lg font-light leading-relaxed border-l-4 border-indigo-200 pl-8 italic">"{currentAnalysis?.jobSummary}"</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Hard Non-Negotiables</h4>
-                        <ul className="space-y-3">
+                <div className="md:col-span-2 space-y-10">
+                  <section className="bg-white rounded-[3.5rem] p-12 shadow-2xl shadow-slate-200/50 border border-slate-100">
+                    <h3 className="text-2xl font-black mb-8 flex items-center gap-4 text-slate-800"><Info className="text-indigo-600" size={28}/> Executive Intelligence</h3>
+                    <p className="text-slate-600 text-xl font-medium leading-relaxed border-l-[6px] border-indigo-100 pl-10 italic">"{currentAnalysis?.jobSummary}"</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-12">
+                      <div className="space-y-5">
+                        <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-4">Tactical Non-Negotiables</h4>
+                        <ul className="space-y-4">
                           {currentAnalysis?.priorityRequirements?.map((r, i) => (
-                            <li key={i} className="flex gap-3 text-sm font-bold text-slate-800"><CheckCircle2 className="text-green-500 shrink-0" size={18}/> {r}</li>
+                            <li key={i} className="flex gap-4 text-sm font-bold text-slate-800 bg-slate-50/50 p-4 rounded-2xl border border-slate-100"><CheckCircle2 className="text-green-500 shrink-0" size={20}/> {r}</li>
                           )) || <li className="text-slate-400 text-xs italic">N/A</li>}
                         </ul>
                       </div>
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Tactical Sell-in</h4>
-                        <ul className="space-y-3">
+                      <div className="space-y-5">
+                        <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-4">Submission Playbook</h4>
+                        <ul className="space-y-4">
                           {currentAnalysis?.submissionTips?.map((t, i) => (
-                            <li key={i} className="flex gap-3 text-sm font-medium text-slate-600 italic">
+                            <li key={i} className="flex gap-4 text-sm font-bold text-indigo-700 bg-indigo-50/30 p-4 rounded-2xl border border-indigo-100 italic">
                               <span className="text-indigo-600 font-black">#</span> {t}
                             </li>
                           )) || <li className="text-slate-400 text-xs italic">N/A</li>}
@@ -452,30 +451,31 @@ export default function App() {
                   </section>
 
                   {/* Sourcing Taxonomy */}
-                  <section className="bg-slate-900 rounded-[2rem] p-10 text-white shadow-xl">
-                    <h3 className="text-xl font-black mb-8 tracking-tight">Sourcing Engine</h3>
-                    <div className="space-y-8">
+                  <section className="bg-slate-900 rounded-[3.5rem] p-12 text-white shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-12 opacity-5 rotate-12 group-hover:rotate-0 transition-transform duration-700"><Search size={200}/></div>
+                    <h3 className="text-2xl font-black mb-10 tracking-tight flex items-center gap-4"><Waves className="text-indigo-400" size={28}/> Sourcing Architecture</h3>
+                    <div className="space-y-10 relative z-10">
                       <div>
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Boolean Master String</h4>
-                        <div className="bg-slate-800 p-6 rounded-2xl font-mono text-[11px] text-indigo-300 break-words border border-slate-700">
-                          {currentAnalysis?.keywords?.booleanStrings?.[0] || 'Optimizing sourcing logic...'}
+                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Master Boolean String (Global Search)</h4>
+                        <div className="bg-slate-800 p-8 rounded-[2rem] font-mono text-[11px] text-indigo-200 break-words border border-slate-700 leading-relaxed shadow-inner">
+                          {currentAnalysis?.keywords?.booleanStrings?.[0] || 'Compiling sourcing logic...'}
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-8">
+                      <div className="grid grid-cols-2 gap-10">
                         <div>
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Primary Keywords</h4>
-                          <div className="flex flex-wrap gap-2">
+                          <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Focus Keywords</h4>
+                          <div className="flex flex-wrap gap-2.5">
                             {currentAnalysis?.keywords?.primary?.map((k, i) => (
-                              <span key={i} className="px-3 py-1 bg-slate-800 text-indigo-200 rounded-lg text-[10px] font-bold border border-slate-700">{k}</span>
-                            )) || <span className="text-slate-500 text-[10px] italic">Extracting...</span>}
+                              <span key={i} className="px-4 py-2 bg-slate-800 text-indigo-100 rounded-xl text-[10px] font-black border border-slate-700 hover:border-indigo-500 transition-colors">{k}</span>
+                            )) || <span className="text-slate-600 text-[10px] italic">Extracting...</span>}
                           </div>
                         </div>
                         <div>
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Target Companies</h4>
-                          <div className="flex flex-wrap gap-2">
+                          <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Target Competition</h4>
+                          <div className="flex flex-wrap gap-2.5">
                             {currentAnalysis?.targetCompanies?.map((c, i) => (
-                              <span key={i} className="px-3 py-1 bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold border border-slate-700">{c}</span>
-                            )) || <span className="text-slate-500 text-[10px] italic">Researching pools...</span>}
+                              <span key={i} className="px-4 py-2 bg-slate-800 text-slate-400 rounded-xl text-[10px] font-black border border-slate-700 hover:border-slate-500 transition-colors">{c}</span>
+                            )) || <span className="text-slate-600 text-[10px] italic">Researching...</span>}
                           </div>
                         </div>
                       </div>
@@ -484,42 +484,42 @@ export default function App() {
                 </div>
 
                 {/* Right: Candidate Analysis if exists */}
-                <div className="space-y-8">
+                <div className="space-y-10">
                   {currentAnalysis?.candidateAnalysis ? (
-                    <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 space-y-10">
+                    <div className="bg-white rounded-[3.5rem] p-10 shadow-2xl shadow-slate-200/50 border border-slate-100 space-y-12">
                       <div className="text-center">
-                        <div className="inline-flex flex-col items-center justify-center w-32 h-32 rounded-full border-4 border-indigo-50 bg-indigo-50/30 mb-4">
-                          <span className="text-4xl font-black text-indigo-700">{currentAnalysis.candidateAnalysis.overallMatchPercentage || 0}%</span>
-                          <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest">Overall Match</span>
+                        <div className="inline-flex flex-col items-center justify-center w-40 h-40 rounded-full border-[10px] border-indigo-50 bg-indigo-50/20 mb-6 shadow-inner animate-in zoom-in duration-500">
+                          <span className="text-5xl font-black text-indigo-700">{currentAnalysis.candidateAnalysis.overallMatchPercentage || 0}%</span>
+                          <span className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mt-1">Audit Score</span>
                         </div>
                       </div>
 
                       {/* ATS Integrity Audit Section */}
                       {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis && (
-                        <div className="p-6 bg-slate-900 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><ShieldAlert size={60} className="text-white"/></div>
-                          <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-4 flex items-center gap-2">
-                            <Fingerprint size={12}/> ATS Integrity Audit
+                        <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-125 group-hover:-rotate-12 transition-all duration-500"><ShieldAlert size={80} className="text-white"/></div>
+                          <h4 className="text-[11px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-6 flex items-center gap-3">
+                            <Fingerprint size={16}/> ATS Integrity Audit
                           </h4>
-                          <div className="space-y-4 relative z-10">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-slate-400 font-bold">Stuffing Risk</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
-                                currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Low' ? 'bg-green-500/20 text-green-400' : 
-                                currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Elevated' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'
+                          <div className="space-y-5 relative z-10">
+                            <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Risk Factor</span>
+                              <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Low' ? 'bg-green-500 text-white' : 
+                                currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel === 'Elevated' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
                               }`}>
-                                {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel || 'N/A'}
+                                {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.riskLevel || 'Unknown'}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                              {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.findings || 'Analyzing textual patterns...'}
+                            <p className="text-[12px] text-slate-300 leading-relaxed font-medium">
+                              {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.findings || 'No stuffing patterns identified.'}
                             </p>
                             {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters?.length > 0 && (
-                              <div className="pt-2 border-t border-slate-800">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">JD Injection Detected</span>
-                                <div className="flex flex-wrap gap-1.5">
+                              <div className="pt-4 border-t border-slate-800">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3">JD Phrases Injected</span>
+                                <div className="flex flex-wrap gap-2">
                                   {currentAnalysis.candidateAnalysis.keywordStuffingAnalysis.detectedArtificialClusters.map((term, i) => (
-                                    <span key={i} className="px-2 py-1 bg-red-900/30 text-red-300 rounded text-[9px] font-mono border border-red-800/50">{term}</span>
+                                    <span key={i} className="px-2.5 py-1.5 bg-red-900/40 text-red-300 rounded-lg text-[10px] font-mono border border-red-800/50">{term}</span>
                                   ))}
                                 </div>
                               </div>
@@ -528,35 +528,35 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="space-y-6">
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Authenticity Score</span>
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      <div className="space-y-8">
+                        <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
+                          <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Authenticity Score</span>
+                          <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
                             currentAnalysis.candidateAnalysis.authenticityScore === 'High' ? 'bg-green-100 text-green-700' : 
                             currentAnalysis.candidateAnalysis.authenticityScore === 'Caution' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
                           }`}>{currentAnalysis.candidateAnalysis.authenticityScore || 'N/A'}</span>
                         </div>
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 flex items-center gap-2"><History size={12}/> Red Flags & Tenure</h4>
-                          <div className="space-y-2">
-                            {currentAnalysis.candidateAnalysis.employmentGaps?.map((g, i) => <div key={i} className="text-xs font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">GAP: {g}</div>) || []}
-                            {currentAnalysis.candidateAnalysis.shortTermAssignments?.map((s, i) => <div key={i} className="text-xs font-bold text-orange-600 bg-orange-50 p-2 rounded-lg border border-orange-100">STINT: {s}</div>) || []}
-                            {(!currentAnalysis.candidateAnalysis.employmentGaps?.length && !currentAnalysis.candidateAnalysis.shortTermAssignments?.length) && <p className="text-xs text-slate-400 italic">Solid employment history.</p>}
+                        <div className="space-y-4">
+                          <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4 flex items-center gap-3"><History size={16}/> Tenure & Gap Analysis</h4>
+                          <div className="space-y-3">
+                            {currentAnalysis.candidateAnalysis.employmentGaps?.map((g, i) => <div key={i} className="text-xs font-bold text-red-700 bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm">GAP: {g}</div>) || []}
+                            {currentAnalysis.candidateAnalysis.shortTermAssignments?.map((s, i) => <div key={i} className="text-xs font-bold text-orange-700 bg-orange-50 p-4 rounded-2xl border border-orange-100 shadow-sm">STINT: {s}</div>) || []}
+                            {(!currentAnalysis.candidateAnalysis.employmentGaps?.length && !currentAnalysis.candidateAnalysis.shortTermAssignments?.length) && <p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-2xl text-center">No stability concerns identified.</p>}
                           </div>
                         </div>
-                        <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100">
-                          <h4 className="text-xs font-black uppercase text-indigo-700 tracking-widest mb-4">Vetting Questions</h4>
-                          <ul className="space-y-3">
-                            {currentAnalysis.candidateAnalysis.recruiterQuestions?.map((q, i) => <li key={i} className="text-xs font-bold text-indigo-900 leading-snug">"{q}"</li>) || <li className="text-xs italic text-slate-400">N/A</li>}
+                        <div className="p-8 bg-indigo-50/50 rounded-[2.5rem] border border-indigo-100 shadow-sm">
+                          <h4 className="text-xs font-black uppercase text-indigo-700 tracking-[0.2em] mb-6">Recruiter Vetting Matrix</h4>
+                          <ul className="space-y-5">
+                            {currentAnalysis.candidateAnalysis.recruiterQuestions?.map((q, i) => <li key={i} className="text-sm font-bold text-indigo-900 leading-snug flex gap-3"><PlusCircle size={16} className="text-indigo-400 shrink-0 mt-0.5"/> "{q}"</li>) || <li className="text-xs italic text-slate-400">N/A</li>}
                           </ul>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100 border-dashed flex flex-col items-center justify-center text-center opacity-60 h-full min-h-[400px]">
-                      <Search size={48} className="text-slate-300 mb-4"/>
-                      <p className="text-sm font-bold text-slate-400">No Candidate Audit</p>
-                      <p className="text-[10px] text-slate-400 mt-2 max-w-[200px]">Upload a resume to perform an ATS Integrity Audit and Gap Analysis.</p>
+                    <div className="bg-white rounded-[3.5rem] p-12 shadow-2xl shadow-slate-200/50 border border-slate-100 border-dashed flex flex-col items-center justify-center text-center opacity-70 h-full min-h-[500px]">
+                      <Fingerprint size={64} className="text-slate-200 mb-6"/>
+                      <p className="text-lg font-black text-slate-400">Forensic Audit Required</p>
+                      <p className="text-xs text-slate-400 mt-3 max-w-[220px] leading-relaxed">Analyze a resume alongside the JD to perform a forensic audit of tenure, authenticity, and keyword stuffing.</p>
                     </div>
                   )}
                 </div>
@@ -565,17 +565,17 @@ export default function App() {
 
             {/* Benchmark Resume Tab */}
             {activeTab === 'resume' && (
-              <div className="max-w-4xl mx-auto space-y-6">
-                <div className="flex items-center justify-between no-print px-4">
+              <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-6 duration-500">
+                <div className="flex items-center justify-between no-print px-8">
                   <div>
-                    <h3 className="text-xl font-black">Benchmark Candidate Profile</h3>
-                    <p className="text-xs text-slate-500 font-medium tracking-widest uppercase">Target profile blueprint for this role</p>
+                    <h3 className="text-2xl font-black text-slate-800">Benchmark Candidate Matrix</h3>
+                    <p className="text-xs text-slate-400 font-black tracking-[0.2em] uppercase mt-1">Ideal profile architecture for this mandate</p>
                   </div>
-                  <button onClick={() => window.print()} className="bg-white border border-slate-200 text-slate-900 px-6 py-2 rounded-2xl text-xs font-bold hover:bg-slate-50 shadow-sm transition flex items-center gap-2">
-                    <Download size={14}/> Save Profile PDF
+                  <button onClick={() => window.print()} className="bg-white border border-slate-200 text-slate-900 px-8 py-3 rounded-2xl text-xs font-black hover:bg-slate-50 shadow-xl transition-all flex items-center gap-3">
+                    <Download size={18}/> Export Profile (PDF)
                   </button>
                 </div>
-                <div className="bg-white p-20 shadow-2xl border border-slate-100 mx-auto w-full min-h-[1100px] resume-container rounded-sm">
+                <div className="bg-white p-24 shadow-2xl border border-slate-100 mx-auto w-full min-h-[1100px] resume-container rounded-sm">
                   {currentAnalysis && <ResumeRenderer markdown={currentAnalysis.sampleResume} />}
                 </div>
               </div>
@@ -583,21 +583,22 @@ export default function App() {
 
             {/* Tech Glossary Tab */}
             {activeTab === 'glossary' && (
-              <div className="space-y-8 animate-in zoom-in duration-300">
-                <header className="bg-indigo-600 rounded-[2rem] p-10 text-white shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-10 opacity-10"><BookOpen size={160}/></div>
-                  <div className="relative z-10 space-y-4">
-                    <h3 className="text-3xl font-black">Technical Decoder</h3>
-                    <p className="text-indigo-100 max-w-2xl leading-relaxed font-medium">Clear definitions for technical terminology found in the Job Description to assist with non-technical vetting.</p>
+              <div className="space-y-10 animate-in zoom-in duration-500">
+                <header className="bg-indigo-600 rounded-[3.5rem] p-16 text-white shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-16 opacity-10 rotate-12 scale-150"><BookOpen size={200}/></div>
+                  <div className="relative z-10 space-y-6">
+                    <h3 className="text-4xl font-black tracking-tight">Technical Knowledge Decoder</h3>
+                    <p className="text-indigo-100 text-xl max-w-2xl leading-relaxed font-medium">Equipping recruiters with deep contextual understanding of technical requirements found in the Job Description.</p>
                   </div>
                 </header>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {currentAnalysis?.techGlossary?.map((item, i) => (
-                    <div key={i} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-indigo-200 transition-colors">
-                      <h4 className="text-indigo-600 font-black mb-3 text-lg group-hover:scale-105 transition-transform origin-left">{item.term}</h4>
-                      <p className="text-slate-600 text-sm leading-relaxed font-medium">{item.explanation}</p>
+                    <div key={i} className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/30 border border-slate-100 group hover:border-indigo-400 transition-all hover:-translate-y-2">
+                      <div className="w-12 h-1 bg-indigo-200 mb-6 group-hover:w-full transition-all duration-500"></div>
+                      <h4 className="text-indigo-600 font-black mb-4 text-xl tracking-tight">{item.term}</h4>
+                      <p className="text-slate-600 text-sm leading-relaxed font-bold">{item.explanation}</p>
                     </div>
-                  )) || <div className="text-slate-400 italic">No glossary entries available.</div>}
+                  )) || <div className="text-slate-400 italic col-span-full py-20 text-center">No technical glossary entries compiled for this requirement.</div>}
                 </div>
               </div>
             )}
@@ -607,16 +608,31 @@ export default function App() {
 
         {/* Floating Active Indicator */}
         {isLiveActive && (
-          <div className="fixed bottom-10 right-10 z-50">
-            <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-indigo-500 ring-4 ring-indigo-500/20">
-              <div className="flex gap-0.5">
-                {[1,2,3,4].map(i => <div key={i} className="w-1 bg-indigo-400 rounded-full animate-pulse" style={{ height: `${Math.random()*20 + 4}px`, animationDelay: `${i*100}ms` }} />)}
+          <div className="fixed bottom-12 right-12 z-50 animate-in slide-in-from-right-10 duration-500">
+            <div className="bg-slate-900 text-white px-8 py-4 rounded-[2rem] shadow-[0_35px_60px_-15px_rgba(79,70,229,0.3)] flex items-center gap-4 border border-indigo-500 ring-8 ring-indigo-500/10">
+              <div className="flex gap-1 items-end h-6">
+                {[1,2,3,4,5].map(i => <div key={i} className="w-1.5 bg-indigo-400 rounded-full animate-wave" style={{ height: `${Math.random()*100}%`, animationDelay: `${i*150}ms` }} />)}
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest">Assistant Live</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-100">Audit Assistant Active</span>
             </div>
           </div>
         )}
       </main>
+      
+      <style>{`
+        @keyframes wave {
+          0%, 100% { height: 20%; }
+          50% { height: 100%; }
+        }
+        .animate-wave { animation: wave 1s infinite ease-in-out; }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+          10%, 90% { transform: translate3d(-1px, 0, 0); }
+          20%, 80% { transform: translate3d(2px, 0, 0); }
+          30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+          40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+      `}</style>
     </div>
   );
 }

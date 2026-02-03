@@ -11,6 +11,13 @@ export interface GeminiPartBlob {
 
 const getLameJS = () => (window as any).lamejs;
 
+/**
+ * Cleans the AI response by removing markdown code blocks if present.
+ */
+const cleanJsonResponse = (text: string): string => {
+  return text.replace(/```json\n?/, '').replace(/\n?```/, '').trim();
+};
+
 export const analyzeRecruitment = async (
   jd: string,
   resume?: string
@@ -23,24 +30,26 @@ export const analyzeRecruitment = async (
     
     ${resume ? `Candidate Resume for Analysis:\n${resume}` : "No candidate provided. Analyze the requirement for a target candidate benchmark profile."}
     
-    TASK: Provide a deep recruitment strategy and (if resume provided) a forensic audit of the candidate.
-    
-    CRITICAL INSTRUCTION FOR KEYWORD STUFFING:
-    Scan the resume specifically for "Job Description Injection". This is when a candidate copies phrases or unique keywords directly from the Job Description into their skills or summary section to trick ATS filters. 
-    Compare the unique terminology in the JD: "${jd.substring(0, 1000)}" against the resume.
+    TASK: Provide a deep recruitment strategy. 
+    ${resume ? `
+    FORENSIC AUDIT INSTRUCTIONS:
+    1. Scan for "Keyword Stuffing": Does the candidate have lists of skills that are not supported by the experience section?
+    2. Scan for "JD Injection": Did the candidate copy unique phrases or specific jargon directly from the JD provided above?
+    3. Authenticity: Score the likelihood that this resume was modified specifically to game this Job Description.
+    ` : ""}
     
     MANDATORY OUTPUT STRUCTURE (JSON):
-    1. title: Official Job Title.
-    2. jobSummary: 2-3 sentence strategic overview.
-    3. priorityRequirements: Array of must-have skills.
-    4. essentialCvElements: Array of markers that must be on a CV.
-    5. hiringManagerPreferences: Array of cultural/soft preferences.
-    6. submissionTips: Array of tactical sell-in tips.
-    7. targetCompanies: Array of companies to headhunt from.
-    8. keywords: { primary: [], secondary: [], booleanStrings: [] }
-    9. techGlossary: [{ term: string, explanation: string }] (5-8 terms)
-    10. sampleResume: Professional Markdown benchmark profile.
-    11. candidateAnalysis: (ONLY if resume provided)
+    - title: Job Title.
+    - jobSummary: 2-3 sentence overview.
+    - priorityRequirements: Array of top 5 critical skills.
+    - essentialCvElements: Array of CV markers.
+    - hiringManagerPreferences: Array of cultural/soft preferences.
+    - submissionTips: Array of sell-in tips.
+    - targetCompanies: Array of companies.
+    - keywords: { primary: [], secondary: [], booleanStrings: [] }
+    - techGlossary: [{ term: string, explanation: string }]
+    - sampleResume: Professional Markdown benchmark.
+    - candidateAnalysis: (ONLY if resume provided)
         - overallMatchPercentage: (Number)
         - skillMatchPercentage: (Number)
         - matchingStrengths: []
@@ -54,7 +63,7 @@ export const analyzeRecruitment = async (
             - findings: Detail if they used JD-specific phrases unnaturally.
             - detectedArtificialClusters: List phrases copied directly from JD.
         - recruiterQuestions: []
-    12. audioScript: Recruiter briefing script.
+    - audioScript: Briefing script.
   `;
 
   const response = await ai.models.generateContent({
@@ -124,10 +133,11 @@ export const analyzeRecruitment = async (
   });
 
   try {
-    return JSON.parse(response.text);
+    const cleaned = cleanJsonResponse(response.text);
+    return JSON.parse(cleaned);
   } catch (e) {
     console.error("JSON Parsing failed. Raw response:", response.text);
-    throw new Error("The AI returned an invalid format. Please try refining the job description.");
+    throw new Error("Invalid AI response format. Please refresh and try again.");
   }
 };
 
@@ -207,7 +217,7 @@ export const generateAudio = async (text: string): Promise<string> => {
 
 function encodeMp3(pcmData: Uint8Array, channels: number, sampleRate: number, kbps: number): Blob {
   const lame = getLameJS();
-  if (!lame) throw new Error("Audio engine (lamejs) not initialized.");
+  if (!lame) throw new Error("Audio library (lamejs) not detected. Ensure index.html includes the script.");
   const mp3encoder = new lame.Mp3Encoder(channels, sampleRate, kbps);
   const samples = new Int16Array(pcmData.buffer);
   const mp3Data: Uint8Array[] = [];
